@@ -1,0 +1,2 @@
+./stest |mplayer -demuxer h264es -fps 10 -
+
