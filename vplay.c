@@ -25,7 +25,7 @@ void copy_to_buffer(char *data, int len){
     if(save_data(data, len) != len){
         printf("buffer overflow....\n");
     }
-    printf("saving done. cur size %d\n", get_data_cnt());
+    printf("saving done. %d.  cur size %d\n", len, get_data_cnt());
     return;
 }
 
@@ -84,11 +84,13 @@ int main(void) {
         return -1;
     }
 
+    /*
     while(1){
         sleep(1);
-        if(get_data_cnt() > 3000000) break;
+        if(get_data_cnt() > 100000) break;
         printf("waiting.....\n");
     }
+    */
 
     sdl_main();
     pthread_exit(NULL);

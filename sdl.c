@@ -12,6 +12,23 @@ struct buffer_data {
     size_t size; ///< size left in the buffer
 };
 
+static int read_packet2(void *opaque, uint8_t *buf, int buf_size)
+{
+    struct buffer_data *bd = (struct buffer_data *)opaque;
+    buf_size = FFMIN(buf_size, bd->size);
+
+    printf("ptr:%p size:%zu\n", bd->ptr, bd->size);
+
+    /* copy internal buffer data to buf */
+    memcpy(buf, bd->ptr, buf_size);
+    bd->ptr  += buf_size;
+    bd->size -= buf_size;
+
+    return buf_size;
+}
+
+
+
 static int read_packet(void *opaque, uint8_t *buf, int buf_size)
 {
     struct buffer_data *bd = (struct buffer_data *)opaque;
@@ -19,6 +36,7 @@ static int read_packet(void *opaque, uint8_t *buf, int buf_size)
 
     /* copy internal buffer data to buf */
     ret = get_data(buf, buf_size);
+    //ret = get_frame(buf, buf_size);
 
     printf("cur_data_sz %d, readbuf size %d read_len %d\n", get_data_cnt(), buf_size, ret);
 
@@ -48,13 +66,11 @@ void SaveFrame(AVFrame *pFrame, int width, int height, int iFrame) {
 }
 
 
-
-
 void sdl_main(){
     AVFormatContext *fmt_ctx = NULL;
     AVIOContext *avio_ctx = NULL;
     uint8_t *buffer = NULL, *avio_ctx_buffer = NULL;
-    size_t buffer_size, avio_ctx_buffer_size = 4096;
+    size_t buffer_size, avio_ctx_buffer_size = 100000;
     char *input_filename = NULL;
     int ret = 0;
     struct buffer_data bd = { 0 };
@@ -62,8 +78,8 @@ void sdl_main(){
 
   int               i, videoStream;
   AVCodecContext    *pCodecCtxOrig = NULL;
-  AVCodecContext    *pCodecCtx = NULL;
-  AVCodec           *pCodec = NULL;
+  AVCodecContext    *pCodecCtx = NULL, *c;
+  AVCodec           *pCodec = NULL, *codec;
   AVFrame           *pFrame = NULL;
   AVFrame           *pFrameRGB = NULL;
   AVPacket          packet;
@@ -80,6 +96,16 @@ void sdl_main(){
     bd.ptr  = (uint8_t *)get_buf_ptr();
     bd.size = (size_t)get_buf_size();
 
+    ///////
+    ret = av_file_map("test.h264", &buffer, &buffer_size, 0, NULL);
+    if(ret < 0) goto end;
+
+    bd.ptr = buffer;
+    bd.size = buffer_size;
+
+    /////
+
+
     if (!(fmt_ctx = avformat_alloc_context())) {
         ret = AVERROR(ENOMEM);
         goto end;
@@ -91,7 +117,7 @@ void sdl_main(){
         goto end;
     }
     avio_ctx = avio_alloc_context(avio_ctx_buffer, avio_ctx_buffer_size,
-                                  0, &bd, &read_packet, NULL, NULL);
+                                  0, &bd, &read_packet2, NULL, NULL);
     if (!avio_ctx) {
         ret = AVERROR(ENOMEM);
         goto end;
@@ -104,12 +130,32 @@ void sdl_main(){
         goto end;
     }
 
+    codec = avcodec_find_decoder(AV_CODEC_ID_H263);
+    if(!codec){
+        fprintf(stderr, "Could not open codec\n");
+        goto end;
+    }
+
+    c = avcodec_alloc_context3(codec);
+    if(!c){
+        fprintf(stderr, "Could not alloc codec\n");
+        goto end;
+    }
+    fmt_ctx->streams[0]->codec = codec;
+   // fmt_ctx->streams[0]->codec->framerate = 5;
+
+    if(avcodec_open2(c, fmt_ctx->streams[0]->codec, NULL) < 0){
+        fprintf(stderr, "Could not open avcodec2\n");
+        goto end;
+    }
     
+    /*
     ret = avformat_find_stream_info(fmt_ctx, NULL);
     if (ret < 0) {
         fprintf(stderr, "Could not find stream information\n");
         goto end;
     }
+    */
 
     av_dump_format(fmt_ctx, 0, "test", 0);
     
